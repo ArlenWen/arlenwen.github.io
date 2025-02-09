@@ -1,0 +1,371 @@
+<html>
+<head>
+    <meta charset="utf-8"/>
+<meta name="description" content=""/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+<title>PersonalToolsDeploy | MingminWen&#39;s Blog</title>
+
+<link rel="shortcut icon" href="https://blog.wenmingmin.site/favicon.ico?v=1739110776158">
+
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://blog.wenmingmin.site/styles/main.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.0/dist/css/bootstrap.min.css">
+
+<script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets/highlight.min.js"></script>
+<script src="https://cdn.bootcss.com/highlight.js/9.15.10/languages/dockerfile.min.js"></script>
+<script src="https://cdn.bootcss.com/highlight.js/9.15.10/languages/dart.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/moment@2.27.0/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.0/dist/js/bootstrap.min.js"></script>
+<!-- DEMO JS -->
+<!--<script src="media/scripts/index.js"></script>-->
+
+
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.css">
+</head>
+<body>
+<div class="main gt-bg-theme-color-first">
+    <nav class="navbar navbar-expand-lg">
+    <div class="navbar-brand">
+        <img class="user-avatar" src="/images/avatar.png" alt="头像">
+        <div class="site-name gt-c-content-color-first">
+            MingminWen&#39;s Blog
+        </div>
+    </div>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <i class="fas fa-bars gt-c-content-color-first" style="font-size: 18px"></i>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <div class="navbar-nav mr-auto" style="text-align: center">
+            
+                <div class="nav-item">
+                    
+                        <a href="/" class="menu gt-a-link">
+                            首页
+                        </a>
+                    
+                </div>
+            
+                <div class="nav-item">
+                    
+                        <a href="/archives" class="menu gt-a-link">
+                            归档
+                        </a>
+                    
+                </div>
+            
+                <div class="nav-item">
+                    
+                        <a href="/tags" class="menu gt-a-link">
+                            标签
+                        </a>
+                    
+                </div>
+            
+                <div class="nav-item">
+                    
+                        <a href="/post/about" class="menu gt-a-link">
+                            关于
+                        </a>
+                    
+                </div>
+            
+        </div>
+        <div style="text-align: center">
+            <form id="gridea-search-form" style="position: relative" data-update="1739110776158" action="/search/index.html">
+                <input class="search-input" autocomplete="off" spellcheck="false" name="q" placeholder="搜索文章" />
+                <i class="fas fa-search gt-c-content-color-first" style="position: absolute; top: 9px; left: 10px;"></i>
+            </form>
+        </div>
+    </div>
+</nav>
+
+    <div class="post-container">
+        <div class="post-detail gt-bg-theme-color-second">
+            <article class="gt-post-content">
+                <h2 class="post-title">
+                    PersonalToolsDeploy
+                </h2>
+                <div class="post-info">
+                    <time class="post-time gt-c-content-color-first">
+                        · 2024-09-16 ·
+                    </time>
+                    
+                </div>
+                <div class="post-content">
+                    <h1 id="个人使用的工具部署记录">个人使用的工具部署记录</h1>
+<h2 id="alist">Alist</h2>
+<h3 id="docker">Docker</h3>
+<p>参考 <a href="https://alist.nn.ci/zh/guide/install/docker.html">alist官方文档Docker部署</a></p>
+<h3 id="systemd">Systemd</h3>
+<p>按照<a href="https://alist.nn.ci/zh/guide/install/manual.html">alist官方文档</a>下载二进制包，部署并运行。<br>
+编辑文件 <code>/etc/systemd/system/alist.service</code> ， 写入内容：</p>
+<pre><code class="language-service">[Unit]  
+Description=alist server  
+After=network-online.target  
+Before=nss-lookup.target  
+Wants=network-online.target nss-lookup.target  
+  
+[Service]  
+WorkingDirectory=/home/arlen/tools/  
+ExecStart=/home/arlen/tools/alist server  
+ExecStop=/bin/kill -SIGINT $MAINPID  
+User=arlen  
+  
+[Install]  
+WantedBy=multi-user.target
+</code></pre>
+<h2 id="swagger">Swagger</h2>
+<h3 id="docker-compose-deploy">Docker Compose deploy</h3>
+<pre><code class="language-yaml">services:
+  swagger-editor:
+    image: swaggerapi/swagger-editor:latest
+    ports:
+      - 4567:8080
+    volumes:
+      - /home/arlen/Documents/swagger/:/workspace/
+    restart: unless-stopped
+    environment:
+      SWAGGER_FILE: &quot;/workspace/group.json&quot;
+  swagger-ui:
+    image: swaggerapi/swagger-ui:v5.18.2
+    ports:
+      - 8080:8080
+    volumes:
+      - /home/arlen/Documents/swagger/:/usr/share/nginx/html/workspace/
+    restart: unless-stopped
+    environment:
+      SWAGGER_JSON_URL: &quot;http://127.0.0.1:8080/workspace/openapi.json&quot;
+
+</code></pre>
+<h3 id="deploy-single">Deploy Single</h3>
+<h4 id="swagger-editor">Swagger Editor</h4>
+<pre><code class="language-bash">docker run -d -p 4567:8080 -v /home/arlen/Documents/swagger/:/workspace/ -e SWAGGER_FILE=/workspace/group.json --name=swagger-editor swaggerapi/swagger-editor:latest
+</code></pre>
+<h4 id="swagger-ui">Swagger UI</h4>
+<pre><code class="language-bash">docker run -d -p 8080:8080 -e SWAGGER_JSON_URL=http://127.0.0.1:8080/workspace/openapi.json -v /home/arlen/Documents/swagger/:/usr/share/nginx/html/workspace/ --name=swagger-ui swaggerapi/swagger-ui:v5.18.2
+</code></pre>
+<h2 id="命令行工具">命令行工具</h2>
+<h3 id="tldr">tldr</h3>
+<p>Too Long; Didn't Read;<br>
+简化了<code>man</code>命令输出，只列出常用的几个命令参数以及说明;</p>
+<p>github: <a href="https://github.com/tldr-pages/tldr">https://github.com/tldr-pages/tldr</a></p>
+<h3 id="hstr">hstr</h3>
+<p>记录终端执行过的历史命令， 并提供快速查找功能。</p>
+<p>github: <a href="https://github.com/dvorka/hstr">https://github.com/dvorka/hstr</a></p>
+<h3 id="mdbook">mdbook</h3>
+<p>渲染markdown文件为web站点，并以书籍目录的方式展示相关联的markdown文件。<br>
+使用<code>book.toml</code>来描述整个项目。</p>
+<pre><code class="language-textfile">| book_dir 
+| -- book.toml 项目描述文件
+| -- book 生成的站点文件
+| -- src  markdown文件根目录
+| -- | SUMMARY.md 目录文件
+| -- | other markdown files
+</code></pre>
+<pre><code class="language-bash"># 当前目录为根目录， 渲染站点并展示，监听端口8912， 允许任意来源ip的连接
+mdbook serve ./ -p 8912 -n 0.0.0.0
+</code></pre>
+<pre><code class="language-python">#!/usr/bin/python3
+# -*- encoding: UTF-8 -*-
+# Author: arlen
+# filename: generate_summary.py
+# usage: generate SUMMARY.md by scan all md files
+&quot;&quot;&quot;
+将该脚本放在mdbook目录结构中的src目录下， 执行python3 generate_summary.py
+扫描脚本所在目录下的所有md文件以及文件夹， 文件夹必须要有一个与目录同名的md文件
+例如目录 ./abcd ，需要一个文件 ./abcd.md
+生成SUMMARY.md文件中内容，供mdbook程序使用
+&quot;&quot;&quot;
+
+import os
+
+IGNORED_PREFIX = &quot;_&quot;
+ALLOWED_FILE_SUFFIX = [&quot;md&quot;]
+FILE_SEP = &quot;.&quot;
+SOURCE_DIR = &quot;src&quot;
+STATIC_DIR = &quot;static&quot;
+SUMMARY_TEMPLATE_FILENAME = &quot;SUMMARY.md&quot;
+SUMMARY_TEMPLATE = &quot;# Summary&quot;
+LINK_TEMPLATE = &quot;{prefix}- [{name}]({path})&quot;
+DIR_TEMPLATE = &quot;{prefix}- {name}&quot;
+
+
+def get_md_files(current_path=None):
+    if current_path is None:
+        current_path = os.getcwd()
+    file_list = {}
+    for i in os.listdir(current_path):
+        if i == STATIC_DIR:
+            continue
+        if i.startswith(IGNORED_PREFIX):
+            continue
+        if i == SUMMARY_TEMPLATE_FILENAME:
+            continue
+        i_path = os.path.join(current_path, i)
+        if os.path.isdir(i_path):
+            if not os.path.isfile(&quot;{}.md&quot;.format(i_path)):
+                raise Exception(&quot;not exist the same name file{} with dir{}&quot;.format(&quot;{}.md&quot;.format(i_path), i_path))
+            if i in file_list.keys():
+                file_list[i][&quot;child&quot;] = get_md_files(i_path)
+            else:
+                file_list[i] = {&quot;name&quot;: i, &quot;path&quot;: i_path, &quot;child&quot;: get_md_files(i_path)}
+        if os.path.isfile(i_path):
+            if not is_md_file(i_path):
+                continue
+            name = FILE_SEP.join(i.split(FILE_SEP)[:-1])
+            if name in file_list.keys():
+                file_list[name][&quot;path&quot;] = i_path
+            else:
+                file_list[name] = {&quot;name&quot;: name, &quot;path&quot;: i_path, &quot;child&quot;: []}
+    return file_list
+
+
+def is_md_file(file_path):
+    if file_path.split(FILE_SEP)[-1] in ALLOWED_FILE_SUFFIX:
+        return True
+    else:
+        return False
+
+
+def generate_summary_content(content: list, file_list, prefix=&quot;&quot;):
+    for f in file_list.values():
+        content.append(LINK_TEMPLATE.format(prefix=prefix, name=f[&quot;name&quot;], path=f[&quot;path&quot;]))
+        if f[&quot;child&quot;]:
+            content = generate_summary_content(content, f[&quot;child&quot;], prefix=&quot;{}    &quot;.format(prefix))
+    return content
+
+
+def write_summary_file(content: str, file_path):
+    with open(file_path, &quot;w&quot;) as f:
+        f.write(content)
+
+
+if __name__ == '__main__':
+    import json
+    wk_path = &quot;./&quot;
+    src_path = os.path.join(wk_path)
+    print(&quot;src path: &quot;, os.path.abspath(src_path))
+    file_list = get_md_files(src_path)
+    print(&quot;file list: &quot;, json.dumps(file_list))
+    content = [SUMMARY_TEMPLATE]
+    content = generate_summary_content(content, file_list)
+    content_str = &quot;\n&quot;.join(content)
+    print(&quot;content: &quot;, content_str)
+    file_path = os.path.join(src_path, SUMMARY_TEMPLATE_FILENAME)
+    print(&quot;will write file: &quot;, file_path)
+    write_summary_file(content_str, file_path)
+    print(&quot;write summary complete&quot;)
+
+</code></pre>
+
+                </div>
+            </article>
+        </div>
+
+        
+            <div class="next-post">
+                <div class="next gt-c-content-color-first">下一篇</div>
+                <a href="https://blog.wenmingmin.site/post/mariadb-shi-tu/" class="post-title gt-a-link">
+                    MariaDB视图
+                </a>
+            </div>
+        
+
+        
+
+        
+            
+                <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk/dist/gitalk.min.css">
+<script src="https://cdn.jsdelivr.net/npm/gitalk/dist/gitalk.min.js"></script>
+<script>
+    // md5.min.js
+    !function(n){
+        "use strict";
+        function d(n,t){var r=(65535&n)+(65535&t);return(n>>16)+(t>>16)+(r>>16)<<16|65535&r}
+        function f(n,t,r,e,o,u){return d((c=d(d(t,n),d(e,u)))<<(f=o)|c>>>32-f,r);var c,f}
+        function l(n,t,r,e,o,u,c){return f(t&r|~t&e,n,t,o,u,c)}
+        function v(n,t,r,e,o,u,c){return f(t&e|r&~e,n,t,o,u,c)}
+        function g(n,t,r,e,o,u,c){return f(t^r^e,n,t,o,u,c)}
+        function m(n,t,r,e,o,u,c){return f(r^(t|~e),n,t,o,u,c)}
+        function i(n,t){var r,e,o,u,c;n[t>>5]|=128<<t%32,n[14+(t+64>>>9<<4)]=t;var f=1732584193,i=-271733879,a=-1732584194,h=271733878;for(r=0;r<n.length;r+=16)f=l(e=f,o=i,u=a,c=h,n[r],7,-680876936),h=l(h,f,i,a,n[r+1],12,-389564586),a=l(a,h,f,i,n[r+2],17,606105819),i=l(i,a,h,f,n[r+3],22,-1044525330),f=l(f,i,a,h,n[r+4],7,-176418897),h=l(h,f,i,a,n[r+5],12,1200080426),a=l(a,h,f,i,n[r+6],17,-1473231341),i=l(i,a,h,f,n[r+7],22,-45705983),f=l(f,i,a,h,n[r+8],7,1770035416),h=l(h,f,i,a,n[r+9],12,-1958414417),a=l(a,h,f,i,n[r+10],17,-42063),i=l(i,a,h,f,n[r+11],22,-1990404162),f=l(f,i,a,h,n[r+12],7,1804603682),h=l(h,f,i,a,n[r+13],12,-40341101),a=l(a,h,f,i,n[r+14],17,-1502002290),f=v(f,i=l(i,a,h,f,n[r+15],22,1236535329),a,h,n[r+1],5,-165796510),h=v(h,f,i,a,n[r+6],9,-1069501632),a=v(a,h,f,i,n[r+11],14,643717713),i=v(i,a,h,f,n[r],20,-373897302),f=v(f,i,a,h,n[r+5],5,-701558691),h=v(h,f,i,a,n[r+10],9,38016083),a=v(a,h,f,i,n[r+15],14,-660478335),i=v(i,a,h,f,n[r+4],20,-405537848),f=v(f,i,a,h,n[r+9],5,568446438),h=v(h,f,i,a,n[r+14],9,-1019803690),a=v(a,h,f,i,n[r+3],14,-187363961),i=v(i,a,h,f,n[r+8],20,1163531501),f=v(f,i,a,h,n[r+13],5,-1444681467),h=v(h,f,i,a,n[r+2],9,-51403784),a=v(a,h,f,i,n[r+7],14,1735328473),f=g(f,i=v(i,a,h,f,n[r+12],20,-1926607734),a,h,n[r+5],4,-378558),h=g(h,f,i,a,n[r+8],11,-2022574463),a=g(a,h,f,i,n[r+11],16,1839030562),i=g(i,a,h,f,n[r+14],23,-35309556),f=g(f,i,a,h,n[r+1],4,-1530992060),h=g(h,f,i,a,n[r+4],11,1272893353),a=g(a,h,f,i,n[r+7],16,-155497632),i=g(i,a,h,f,n[r+10],23,-1094730640),f=g(f,i,a,h,n[r+13],4,681279174),h=g(h,f,i,a,n[r],11,-358537222),a=g(a,h,f,i,n[r+3],16,-722521979),i=g(i,a,h,f,n[r+6],23,76029189),f=g(f,i,a,h,n[r+9],4,-640364487),h=g(h,f,i,a,n[r+12],11,-421815835),a=g(a,h,f,i,n[r+15],16,530742520),f=m(f,i=g(i,a,h,f,n[r+2],23,-995338651),a,h,n[r],6,-198630844),h=m(h,f,i,a,n[r+7],10,1126891415),a=m(a,h,f,i,n[r+14],15,-1416354905),i=m(i,a,h,f,n[r+5],21,-57434055),f=m(f,i,a,h,n[r+12],6,1700485571),h=m(h,f,i,a,n[r+3],10,-1894986606),a=m(a,h,f,i,n[r+10],15,-1051523),i=m(i,a,h,f,n[r+1],21,-2054922799),f=m(f,i,a,h,n[r+8],6,1873313359),h=m(h,f,i,a,n[r+15],10,-30611744),a=m(a,h,f,i,n[r+6],15,-1560198380),i=m(i,a,h,f,n[r+13],21,1309151649),f=m(f,i,a,h,n[r+4],6,-145523070),h=m(h,f,i,a,n[r+11],10,-1120210379),a=m(a,h,f,i,n[r+2],15,718787259),i=m(i,a,h,f,n[r+9],21,-343485551),f=d(f,e),i=d(i,o),a=d(a,u),h=d(h,c);return[f,i,a,h]}
+        function a(n){var t,r="",e=32*n.length;for(t=0;t<e;t+=8)r+=String.fromCharCode(n[t>>5]>>>t%32&255);return r}
+        function h(n){var t,r=[];for(r[(n.length>>2)-1]=void 0,t=0;t<r.length;t+=1)r[t]=0;var e=8*n.length;for(t=0;t<e;t+=8)r[t>>5]|=(255&n.charCodeAt(t/8))<<t%32;return r}
+        function e(n){var t,r,e="0123456789abcdef",o="";for(r=0;r<n.length;r+=1)t=n.charCodeAt(r),o+=e.charAt(t>>>4&15)+e.charAt(15&t);return o}
+        function r(n){return unescape(encodeURIComponent(n))}
+        function o(n){return a(i(h(t=r(n)),8*t.length));var t}
+        function u(n,t){return function(n,t){var r,e,o=h(n),u=[],c=[];for(u[15]=c[15]=void 0,16<o.length&&(o=i(o,8*n.length)),r=0;r<16;r+=1)u[r]=909522486^o[r],c[r]=1549556828^o[r];return e=i(u.concat(h(t)),512+8*t.length),a(i(c.concat(e),640))}(r(n),r(t))}
+        function t(n,t,r){return t?r?u(t,n):e(u(t,n)):r?o(n):e(o(n))}
+        "function"==typeof define&&define.amd?define(function(){return t}):"object"==typeof module&&module.exports?module.exports=t:n.md5=t;
+    }(this);
+</script>
+
+
+<div id="gitalk-container"></div>
+
+<script>
+
+  var gitalk = new Gitalk({
+    clientID: 'Ov23li9q2XrYx8rSi21H',
+    clientSecret: 'b01aa4c2530e1d9010857f46686203a9c24c738c',
+    repo: 'arlenwen.github.io',
+    owner: 'ArlenWen',
+    admin: ['ArlenWen'],
+    id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+    distractionFreeMode: false       // Facebook-like distraction free mode
+  })
+
+  gitalk.render('gitalk-container')
+
+</script>
+
+            
+
+            
+        
+
+        
+
+        <div class="site-footer gt-c-content-color-first">
+    <div class="slogan gt-c-content-color-first">好好记录自己的技术生涯</div>
+    <div class="social-container">
+        
+            
+                <a href="https://github.com/ArlenWen" target="_blank">
+                    <i class="fab fa-github gt-c-content-color-first"></i>
+                </a>
+            
+        
+            
+        
+            
+        
+            
+        
+            
+        
+            
+        
+    </div>
+    <div class="footer-info">
+        Powered by <a href="https://github.com/getgridea/gridea" target="_blank">Gridea</a>
+    </div>
+    <div>
+        Theme by <a href="https://imhanjie.com/" target="_blank">imhanjie</a>, Powered by <a
+                href="https://github.com/getgridea/gridea" target="_blank">Gridea | <a href="https://blog.wenmingmin.site/atom.xml" target="_blank">RSS</a></a>
+    </div>
+</div>
+
+<script>
+  hljs.initHighlightingOnLoad()
+</script>
+
+    </div>
+</div>
+</body>
+</html>

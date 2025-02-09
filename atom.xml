@@ -1,0 +1,592 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <id>https://blog.wenmingmin.site</id>
+    <title>MingminWen&apos;s Blog</title>
+    <updated>2025-02-09T14:19:39.539Z</updated>
+    <generator>https://github.com/jpmonette/feed</generator>
+    <link rel="alternate" href="https://blog.wenmingmin.site"/>
+    <link rel="self" href="https://blog.wenmingmin.site/atom.xml"/>
+    <subtitle>好好记录自己的技术生涯</subtitle>
+    <logo>https://blog.wenmingmin.site/images/avatar.png</logo>
+    <icon>https://blog.wenmingmin.site/favicon.ico</icon>
+    <rights>All rights reserved 2025, MingminWen&apos;s Blog</rights>
+    <entry>
+        <title type="html"><![CDATA[SSH操作]]></title>
+        <id>https://blog.wenmingmin.site/post/ssh-cao-zuo/</id>
+        <link href="https://blog.wenmingmin.site/post/ssh-cao-zuo/">
+        </link>
+        <updated>2025-02-09T14:11:03.000Z</updated>
+        <content type="html"><![CDATA[<h2 id="端口转发">端口转发</h2>
+<h3 id="本地转发">本地转发</h3>
+<p>本地转发（local forwarding）指的是，创建一个本地端口，将发往该端口的所有通信都通过 SSH 服务器，转发到指定的远程服务器的端口。这种情况下，SSH 服务器只是一个作为跳板的中介，用于连接本地计算机无法直接连接的远程服务器。本地转发是在本地计算机建立的转发规则。</p>
+<p>它的语法如下，其中会指定本地端口（local-port）、SSH 服务器（tunnel-host）、远程服务器（target-host）和远程端口（target-port）。</p>
+<pre><code class="language-bash"># 与 tunnel-host 建立ssh channel, 当访问本机的 local-port 使， 将请求传输到 tunnel-host 上， 由 tunnel-host 向 target-host 的 target-port 发起请求，获取数据后返回本机。
+# 可以理解 tunnel-host 是个代理
+ssh -L -N -f local-port:target-host:target-port tunnel-host
+</code></pre>
+<p>有三个配置参数：</p>
+<ul>
+<li><code>-L</code>：转发本地端口。</li>
+<li><code>-N</code>：不发送任何命令，只用来建立连接。没有这个参数，会在 SSH 服务器打开一个 Shell。</li>
+<li><code>-f</code>：将 SSH 连接放到后台。没有这个参数，暂时不用 SSH 连接时，终端会失去响应。</li>
+</ul>
+<p>如果经常使用本地转发，可以将设置写入 SSH 客户端的用户个人配置文件（<code>~/.ssh/config</code>）。</p>
+<pre><code class="language-config">Host test.example.com
+LocalForward client-IP:client-port server-IP:server-port
+</code></pre>
+<h3 id="远程转发">远程转发</h3>
+<p>远程转发指的是在远程 SSH 服务器建立的转发规则。</p>
+<p>它跟本地转发正好反过来。建立本地计算机到远程 SSH 服务器的隧道以后，本地转发是通过本地计算机访问远程 SSH 服务器，而远程转发则是通过远程 SSH 服务器访问本地计算机（访问远程SSH服务器端口， 请求会转发到本地的端口上）。</p>
+<pre><code>$ ssh -R remote-port:target-host:target-port -N remotehost
+</code></pre>
+<p>上面命令中，<code>-R</code>参数表示远程端口转发，<code>remote-port</code>是远程 SSH 服务器的端口，<code>target-host</code>和<code>target-port</code>是目标服务器及其端口，<code>remotehost</code>是远程 SSH 服务器。</p>
+<p>如果经常执行远程端口转发，可以将设置写入 SSH 客户端的用户个人配置文件（<code>~/.ssh/config</code>）。</p>
+<pre><code>Host remote-forward
+  HostName test.example.com
+  RemoteForward remote-port target-host:target-port
+</code></pre>
+<p>完成上面的设置后，执行下面的命令就会建立远程转发。</p>
+<pre><code>$ ssh -N remote-forward
+
+# 等同于
+$ ssh -R remote-port:target-host:target-port -N test.example.com
+</code></pre>
+<h3 id="动态转发">动态转发</h3>
+<p>动态转发指的是，本机与 SSH 服务器之间创建了一个加密连接，然后本机内部针对某个端口的通信，都通过这个加密连接转发。它的一个使用场景就是，访问所有外部网站，都通过 SSH 转发。</p>
+<p>动态转发需要把本地端口绑定到 SSH 服务器。至于 SSH 服务器要去访问哪一个网站，完全是动态的，取决于原始通信，所以叫做动态转发。</p>
+<pre><code>$ ssh -D local-port tunnel-host -N
+</code></pre>
+<p>上面命令中，<code>-D</code>表示动态转发，<code>local-port</code>是本地端口，<code>tunnel-host</code>是 SSH 服务器，<code>-N</code>表示这个 SSH 连接只进行端口转发，不登录远程 Shell，不能执行远程命令，只能充当隧道。</p>
+<p>举例来说，如果本地端口是<code>2121</code>，那么动态转发的命令就是下面这样。</p>
+<pre><code>$ ssh -D 2121 tunnel-host -N
+</code></pre>
+<p>注意，这种转发采用了 SOCKS5 协议。访问外部网站时，需要把 HTTP 请求转成 SOCKS5 协议，才能把本地端口的请求转发出去。</p>
+<p>下面是 SSH 隧道建立后的一个使用实例。</p>
+<pre><code>$ curl -x socks5://localhost:2121 http://www.example.com
+</code></pre>
+<p>上面命令中，curl 的<code>-x</code>参数指定代理服务器，即通过 SOCKS5 协议的本地<code>2121</code>端口，访问<code>http://www.example.com</code>。</p>
+<p>如果经常使用动态转发，可以将设置写入 SSH 客户端的用户个人配置文件（<code>~/.ssh/config</code>）。</p>
+<pre><code>DynamicForward tunnel-host:local-port
+</code></pre>
+<h3 id="simple-operation">Simple Operation</h3>
+<pre><code class="language-textile">- Connect to a remote server:  
+  ssh username@remote_host  
+  
+- Connect to a remote server with a specific identity (private key):  
+  ssh -i path/to/key_file username@remote_host  
+  
+- Connect to a remote server using a specific [p]ort:  
+  ssh username@remote_host -p 2222  
+  
+- Run a command on a remote server with a [t]ty allocation allowing interaction with the remote command:  
+  ssh username@remote_host -t command command_arguments  
+  
+- SSH tunneling: [D]ynamic port forwarding (SOCKS proxy on localhost:1080):  
+  ssh -D 1080 username@remote_host  
+  
+- SSH tunneling: Forward a specific port (localhost:9999 to example.org:80) along with disabling pseudo-[T]ty alloc  
+ation and executio[N] of remote commands:  
+  ssh -L 9999:example.org:80 -N -T username@remote_host  
+  
+- SSH [J]umping: Connect through a jumphost to a remote server (Multiple jump hops may be specified separated by co  
+mma characters):  
+  ssh -J username@jump_host username@remote_host  
+  
+- Close a hanged session:  
+  &lt;Enter&gt; ~ .
+</code></pre>
+<h2 id="faq">FAQ</h2>
+<h3 id="提示错误内容为-no-matching-host-key-type-found-their-offer-ssh-rsa">提示错误内容为： no matching host key type found. Their offer: ssh-rsa</h3>
+<p>两种解决办法：</p>
+<ol>
+<li>临时 ssh 增加参数 -o HostKeyAlgorithms=+ssh-rsa</li>
+<li>编辑文件<code>~/.ssh/config</code>， 增加以下内容：</li>
+</ol>
+<pre><code class="language-textfile">HostKeyAlgorithms +ssh-rsa
+PubkeyAcceptedKeyTypes +ssh-rsa
+# StrictHostKeyChecking和CheckHostIP参数也可以加入这个文件
+</code></pre>
+<h3 id="scp命令提示usrlibexecsftp-server-not-found但存在sftp-server">scp命令提示：/usr/libexec/sftp-server: not found，但存在sftp-server</h3>
+<p>可能是服务不兼容问题，尝试使用<code>-O</code>参数，让scp以传统模式(SSH Channel)来传输文件。</p>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[PersonalToolsDeploy]]></title>
+        <id>https://blog.wenmingmin.site/post/personaltoolsdeploy/</id>
+        <link href="https://blog.wenmingmin.site/post/personaltoolsdeploy/">
+        </link>
+        <updated>2024-09-16T14:11:43.000Z</updated>
+        <content type="html"><![CDATA[<h1 id="个人使用的工具部署记录">个人使用的工具部署记录</h1>
+<h2 id="alist">Alist</h2>
+<h3 id="docker">Docker</h3>
+<p>参考 <a href="https://alist.nn.ci/zh/guide/install/docker.html">alist官方文档Docker部署</a></p>
+<h3 id="systemd">Systemd</h3>
+<p>按照<a href="https://alist.nn.ci/zh/guide/install/manual.html">alist官方文档</a>下载二进制包，部署并运行。<br>
+编辑文件 <code>/etc/systemd/system/alist.service</code> ， 写入内容：</p>
+<pre><code class="language-service">[Unit]  
+Description=alist server  
+After=network-online.target  
+Before=nss-lookup.target  
+Wants=network-online.target nss-lookup.target  
+  
+[Service]  
+WorkingDirectory=/home/arlen/tools/  
+ExecStart=/home/arlen/tools/alist server  
+ExecStop=/bin/kill -SIGINT $MAINPID  
+User=arlen  
+  
+[Install]  
+WantedBy=multi-user.target
+</code></pre>
+<h2 id="swagger">Swagger</h2>
+<h3 id="docker-compose-deploy">Docker Compose deploy</h3>
+<pre><code class="language-yaml">services:
+  swagger-editor:
+    image: swaggerapi/swagger-editor:latest
+    ports:
+      - 4567:8080
+    volumes:
+      - /home/arlen/Documents/swagger/:/workspace/
+    restart: unless-stopped
+    environment:
+      SWAGGER_FILE: &quot;/workspace/group.json&quot;
+  swagger-ui:
+    image: swaggerapi/swagger-ui:v5.18.2
+    ports:
+      - 8080:8080
+    volumes:
+      - /home/arlen/Documents/swagger/:/usr/share/nginx/html/workspace/
+    restart: unless-stopped
+    environment:
+      SWAGGER_JSON_URL: &quot;http://127.0.0.1:8080/workspace/openapi.json&quot;
+
+</code></pre>
+<h3 id="deploy-single">Deploy Single</h3>
+<h4 id="swagger-editor">Swagger Editor</h4>
+<pre><code class="language-bash">docker run -d -p 4567:8080 -v /home/arlen/Documents/swagger/:/workspace/ -e SWAGGER_FILE=/workspace/group.json --name=swagger-editor swaggerapi/swagger-editor:latest
+</code></pre>
+<h4 id="swagger-ui">Swagger UI</h4>
+<pre><code class="language-bash">docker run -d -p 8080:8080 -e SWAGGER_JSON_URL=http://127.0.0.1:8080/workspace/openapi.json -v /home/arlen/Documents/swagger/:/usr/share/nginx/html/workspace/ --name=swagger-ui swaggerapi/swagger-ui:v5.18.2
+</code></pre>
+<h2 id="命令行工具">命令行工具</h2>
+<h3 id="tldr">tldr</h3>
+<p>Too Long; Didn't Read;<br>
+简化了<code>man</code>命令输出，只列出常用的几个命令参数以及说明;</p>
+<p>github: <a href="https://github.com/tldr-pages/tldr">https://github.com/tldr-pages/tldr</a></p>
+<h3 id="hstr">hstr</h3>
+<p>记录终端执行过的历史命令， 并提供快速查找功能。</p>
+<p>github: <a href="https://github.com/dvorka/hstr">https://github.com/dvorka/hstr</a></p>
+<h3 id="mdbook">mdbook</h3>
+<p>渲染markdown文件为web站点，并以书籍目录的方式展示相关联的markdown文件。<br>
+使用<code>book.toml</code>来描述整个项目。</p>
+<pre><code class="language-textfile">| book_dir 
+| -- book.toml 项目描述文件
+| -- book 生成的站点文件
+| -- src  markdown文件根目录
+| -- | SUMMARY.md 目录文件
+| -- | other markdown files
+</code></pre>
+<pre><code class="language-bash"># 当前目录为根目录， 渲染站点并展示，监听端口8912， 允许任意来源ip的连接
+mdbook serve ./ -p 8912 -n 0.0.0.0
+</code></pre>
+<pre><code class="language-python">#!/usr/bin/python3
+# -*- encoding: UTF-8 -*-
+# Author: arlen
+# filename: generate_summary.py
+# usage: generate SUMMARY.md by scan all md files
+&quot;&quot;&quot;
+将该脚本放在mdbook目录结构中的src目录下， 执行python3 generate_summary.py
+扫描脚本所在目录下的所有md文件以及文件夹， 文件夹必须要有一个与目录同名的md文件
+例如目录 ./abcd ，需要一个文件 ./abcd.md
+生成SUMMARY.md文件中内容，供mdbook程序使用
+&quot;&quot;&quot;
+
+import os
+
+IGNORED_PREFIX = &quot;_&quot;
+ALLOWED_FILE_SUFFIX = [&quot;md&quot;]
+FILE_SEP = &quot;.&quot;
+SOURCE_DIR = &quot;src&quot;
+STATIC_DIR = &quot;static&quot;
+SUMMARY_TEMPLATE_FILENAME = &quot;SUMMARY.md&quot;
+SUMMARY_TEMPLATE = &quot;# Summary&quot;
+LINK_TEMPLATE = &quot;{prefix}- [{name}]({path})&quot;
+DIR_TEMPLATE = &quot;{prefix}- {name}&quot;
+
+
+def get_md_files(current_path=None):
+    if current_path is None:
+        current_path = os.getcwd()
+    file_list = {}
+    for i in os.listdir(current_path):
+        if i == STATIC_DIR:
+            continue
+        if i.startswith(IGNORED_PREFIX):
+            continue
+        if i == SUMMARY_TEMPLATE_FILENAME:
+            continue
+        i_path = os.path.join(current_path, i)
+        if os.path.isdir(i_path):
+            if not os.path.isfile(&quot;{}.md&quot;.format(i_path)):
+                raise Exception(&quot;not exist the same name file{} with dir{}&quot;.format(&quot;{}.md&quot;.format(i_path), i_path))
+            if i in file_list.keys():
+                file_list[i][&quot;child&quot;] = get_md_files(i_path)
+            else:
+                file_list[i] = {&quot;name&quot;: i, &quot;path&quot;: i_path, &quot;child&quot;: get_md_files(i_path)}
+        if os.path.isfile(i_path):
+            if not is_md_file(i_path):
+                continue
+            name = FILE_SEP.join(i.split(FILE_SEP)[:-1])
+            if name in file_list.keys():
+                file_list[name][&quot;path&quot;] = i_path
+            else:
+                file_list[name] = {&quot;name&quot;: name, &quot;path&quot;: i_path, &quot;child&quot;: []}
+    return file_list
+
+
+def is_md_file(file_path):
+    if file_path.split(FILE_SEP)[-1] in ALLOWED_FILE_SUFFIX:
+        return True
+    else:
+        return False
+
+
+def generate_summary_content(content: list, file_list, prefix=&quot;&quot;):
+    for f in file_list.values():
+        content.append(LINK_TEMPLATE.format(prefix=prefix, name=f[&quot;name&quot;], path=f[&quot;path&quot;]))
+        if f[&quot;child&quot;]:
+            content = generate_summary_content(content, f[&quot;child&quot;], prefix=&quot;{}    &quot;.format(prefix))
+    return content
+
+
+def write_summary_file(content: str, file_path):
+    with open(file_path, &quot;w&quot;) as f:
+        f.write(content)
+
+
+if __name__ == '__main__':
+    import json
+    wk_path = &quot;./&quot;
+    src_path = os.path.join(wk_path)
+    print(&quot;src path: &quot;, os.path.abspath(src_path))
+    file_list = get_md_files(src_path)
+    print(&quot;file list: &quot;, json.dumps(file_list))
+    content = [SUMMARY_TEMPLATE]
+    content = generate_summary_content(content, file_list)
+    content_str = &quot;\n&quot;.join(content)
+    print(&quot;content: &quot;, content_str)
+    file_path = os.path.join(src_path, SUMMARY_TEMPLATE_FILENAME)
+    print(&quot;will write file: &quot;, file_path)
+    write_summary_file(content_str, file_path)
+    print(&quot;write summary complete&quot;)
+
+</code></pre>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[MariaDB视图]]></title>
+        <id>https://blog.wenmingmin.site/post/mariadb-shi-tu/</id>
+        <link href="https://blog.wenmingmin.site/post/mariadb-shi-tu/">
+        </link>
+        <updated>2024-04-10T14:10:11.000Z</updated>
+        <content type="html"><![CDATA[<p>本质上视图是个虚拟表,可以查询,更新,会将数据更新到基础表.</p>
+<pre><code class="language-sql">CREATE [OR REPLACE] [ALGORITHM = {UNDEFINED | MERGE | TEMPTABLE}] VIEW [IF NOT EXISTS] view_name [(column_list)] AS select_statement [WITH [CASCADED | LOCAL] CHECK OPTION] ALTER [ALGORITHM = {UNDEFINED | MERGE | TEMPTABLE}] VIEW view_name [(column_list)] AS select_statement [WITH [CASCADED | LOCAL] CHECK OPTION]
+</code></pre>
+<h2 id="注意点">注意点:</h2>
+<ol>
+<li>创建view时,sql中不能包含子查询;</li>
+<li>使用Replace时,view存在则等同于alter;</li>
+<li>默认为<code>with cascaded check option</code>,即在更新视图时,需要满足视图的约束条件.可以使用<code>with local check option</code>跳过检查;</li>
+<li>视图中的字段是固定化的,即<code>create view name as select * from table</code>后,view的字段和table是一致的,但alter table新增字段后,视图并不包含table新增的字段;</li>
+<li>view定义的select语句中不能出现oreder by,除非使用Top(limit),此时order by只是为了满足top数量要求;</li>
+<li>视图默认使用undefined算法,即由数据库自己决定使用merge还是temptable算法,更倾向于merge,默认为merge;</li>
+<li>merge算法:合并使用视图的sql语句以及视图定义的语句,替换为基础表的表名和字段名;</li>
+<li>temptable算法: 将视图定义的语句执行的结果放入临时表,然后使用临时表进行操作;</li>
+<li>包含这些情况不使用merge算法: having, limit, group by, distinct, union, union all, select中有子查询, 没有基础表, 使用了聚合函数(MAX, COUNT, SUM等);</li>
+<li>使用<code>check table view_name</code>来检查无效视图, 因为视图创建后,基础表可能删除或者更新视图用到的字段;</li>
+<li>嵌套视图可能会出现列错位等导致列不对等的情况,导致读取数据错误,因为创建嵌套视图后更新了base视图;</li>
+</ol>
+<h2 id="参考">参考</h2>
+<p>https://ignorantshr.github.io/person-blog/mysql/15.%20MySQL%E8%A7%86%E5%9B%BE/#11-mysql</p>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[Docker的代理]]></title>
+        <id>https://blog.wenmingmin.site/post/docker-de-dai-li/</id>
+        <link href="https://blog.wenmingmin.site/post/docker-de-dai-li/">
+        </link>
+        <updated>2024-03-09T14:08:16.000Z</updated>
+        <content type="html"><![CDATA[<h1 id="docker的代理">Docker的代理</h1>
+<p>国内相关的docker代理均被ban了，所以需要自己搭建代理，可以借助于serverless功能， 白嫖cloudflare这个互联网大善人。</p>
+<p>推荐给本地的dockerd守护进程配置使用网络代理。</p>
+<p><strong>不建议使用cloudflare来代理Docker Hub。</strong></p>
+<blockquote>
+<p><strong>cloudflare已经更新了条款，不再允许借助CDN来作为代理服务使用，有封号的风险。</strong></p>
+</blockquote>
+<blockquote>
+<p><strong>cloudflare已经更新了条款，不再允许借助CDN来作为代理服务使用，有封号的风险。</strong></p>
+</blockquote>
+<blockquote>
+<p><strong>cloudflare已经更新了条款，不再允许借助CDN来作为代理服务使用，有封号的风险。</strong></p>
+</blockquote>
+<h2 id="dockerd配置代理">dockerd配置代理</h2>
+<pre><code class="language-bash">sudo mkdir -p /etc/systemd/system/docker.service.d
+sudo touch /etc/systemd/system/docker.service.d/proxy.conf
+</code></pre>
+<p>然后编辑文件<code>/etc/systemd/system/docker.service.d/proxy.conf</code>，写入以下内容（其中的代理地址请使用自己的网络代理配置），保存更改后重启Docker。</p>
+<pre><code class="language-textfile">[Service]
+Environment=&quot;HTTP_PROXY=http://127.0.0.1:7890/&quot;
+Environment=&quot;HTTPS_PROXY=http://127.0.0.1:7890/&quot;
+Environment=&quot;NO_PROXY=localhost,127.0.0.1,.example.com&quot;
+</code></pre>
+<h2 id="docker-hub-代理">Docker Hub 代理</h2>
+<p>参考 <a href="https://github.com/cmliu/CF-Workers-docker.io">https://github.com/cmliu/CF-Workers-docker.io</a> ：</p>
+<ol>
+<li>先注册一个cloudflare 账户，使用免费的订阅计划（Free plan）。</li>
+<li>进入cloudflare dashboard -&gt; 账户主页 -&gt; 开发人员平台 -&gt; 创建应用程序 -&gt; pages 。</li>
+<li>这个时候二选一：
+<ol>
+<li>如果fork了上面的github repo, 那就使用 连接到git  ，一步一步按照流程， 部署fork的repo;</li>
+<li>或者 复制 _work.js 的代码， 直接部署;</li>
+</ol>
+</li>
+<li>等待部署完成后， 会有一个cloudflare域(名)，使用该域名（也可以设置pages的自定义域，使用自己个人的域名来指向这个代理）可以直接访问，显示的是docker hub的搜索框， 此时代理步骤完成。</li>
+</ol>
+<h2 id="docker-pull-使用代理">docker pull 使用代理</h2>
+<p>最简单的方式是在pull的镜像名称前加上域名：<code>docker pull  代理域名/镜像名称:镜像标签</code></p>
+<p>还可以配置docker的repo mirror, 编辑<code>/etc/docker/daemon.json</code>文件：</p>
+<pre><code class="language-json">{  
+  &quot;registry-mirrors&quot;: [&quot;https://代理域名/&quot;]  
+}
+</code></pre>
+<p>然后重启docker ， 执行<code>docker info</code>查看registries信息，是否为代理的域名。</p>
+<h2 id="docker-build使用代理">docker build使用代理</h2>
+<p>在build命令中增加参数<code>--build-arg http_proxy=http://代理地址 --build-arg https_proxy=http://代理地址</code></p>
+<p>或者修改文件<code>~/.docker/config.json</code>， 此修改对<code>docker run</code>、<code>docker build</code>生效：</p>
+<pre><code class="language-json">{
+ &quot;proxies&quot;:
+ {
+   &quot;default&quot;:
+   {
+     &quot;httpProxy&quot;: &quot;http://代理地址&quot;,
+     &quot;httpsProxy&quot;: &quot;http://代理地址&quot;,
+     &quot;noProxy&quot;: &quot;localhost,127.0.0.1&quot;
+   }
+ }
+}
+</code></pre>
+<p>修改后，如果不想在容器中使用代理， 将容器中环境变量（http_proxy、https_proxy）设置为空即可。</p>
+<blockquote>
+<p>需要注意的是代理地址需要根据容器使用的网络模式（host、bridge）来变动。</p>
+</blockquote>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[MySQL超时参数]]></title>
+        <id>https://blog.wenmingmin.site/post/mysql-chao-shi-can-shu/</id>
+        <link href="https://blog.wenmingmin.site/post/mysql-chao-shi-can-shu/">
+        </link>
+        <updated>2024-02-09T14:04:28.000Z</updated>
+        <content type="html"><![CDATA[<h1 id="mysql数据库timeout有关参数">MySQL数据库timeout有关参数</h1>
+<h2 id="timeout相关参数">timeout相关参数</h2>
+<blockquote>
+<p>使用 <code>set {global | session} {arg_name}={value}</code> 命令来设置这些参数</p>
+</blockquote>
+<pre><code class="language-textfile">MariaDB [(none)]&gt; show variables like '%timeout%';
++----------------------------+----------+
+| Variable_name | Value |
++----------------------------+----------+
+| connect_timeout | 10 |
+| deadlock_timeout_long | 50000000 |
+| deadlock_timeout_short | 10000 |
+| delayed_insert_timeout | 300 |
+| innodb_lock_wait_timeout | 50 |
+| innodb_rollback_on_timeout | OFF |
+| interactive_timeout | 100 |
+| lock_wait_timeout | 31536000 |
+| net_read_timeout | 30 |
+| net_write_timeout | 60 |
+| slave_net_timeout | 60 |
+| thread_pool_idle_timeout | 60 |
+| wait_timeout | 100 |
++----------------------------+----------+
+13 rows in set (0.00 sec)
+</code></pre>
+<pre><code class="language-textfile">MySQL test@172.20.16.9:(none)&gt; show variables like '%timeout%';
++-----------------------------+----------+
+| Variable_name | Value |
++-----------------------------+----------+
+| connect_timeout | 10 |
+| delayed_insert_timeout | 300 |
+| have_statement_timeout | YES |
+| innodb_flush_log_at_timeout | 1 |
+| innodb_lock_wait_timeout | 50 |
+| innodb_rollback_on_timeout | OFF |
+| interactive_timeout | 28800 |
+| lock_wait_timeout | 31536000 |
+| net_read_timeout | 30 |
+| net_write_timeout | 60 |
+| rpl_stop_slave_timeout | 31536000 |
+| slave_net_timeout | 60 |
+| wait_timeout | 28800 |
++-----------------------------+----------+
+13 rows in set
+</code></pre>
+<h2 id="参数说明">参数说明</h2>
+<h3 id="connect_timeout">connect_timeout</h3>
+<p>在获取连接阶段(authenticate)起作用，获取MySQL连接是多次握手的结果，除了用户名和密码的匹配校验外，还有IP-&gt;HOST-&gt;DNS-&gt;IP验证，任何一步都可能因为网络问题导致线程阻塞。为了防止线程浪费在不必要的校验等待上，超过connect_timeout的连接请求将会被拒绝。</p>
+<h3 id="delayed_insert_timeout">delayed_insert_timeout</h3>
+<p>为MyISAM INSERT DELAY设计的超时参数，表示INSERT DELAY handler线程在INSERT DELAY语句终止前等待这个INSERT语句的时间，注意是表示insert delay延迟插入的超时时间，不是insert语句。默认值是300S，从5.6.7开始被弃用（因为delayed insert功能被弃用）后续版本将移除。</p>
+<h3 id="innodb_lock_wait_timeoutinnodb的dml操作的行级锁的等待时间">innodb_lock_wait_timeout(innodb的dml操作的行级锁的等待时间)</h3>
+<p>innodb使用这个参数能够有效避免在资源有限的情况下产生太多的锁等待；指的是事务等待获取资源时等待的最长时间，超过这个时间还未分配到资源则会返回应用失败；参数的时间单位是秒，最小可设置为1s(一般不会设置得这么小)，最大可设置1073741824秒(34年)，默认安装时这个值是50s，超过这个时间会报 ERROR 1205 (HY000): Lock wait timeout exceeded; try restarting transaction。</p>
+<h3 id="innodb_rollback_on_timeout">innodb_rollback_on_timeout</h3>
+<p>默认情况下innodb_lock_wait_timeout 超时后只是超时的sql执行失败，整个事务并不回滚，也不做提交，如需要事务在超时的时候回滚，则需要设置innodb_rollback_on_timeout=ON，该参数默认为OFF。</p>
+<h3 id="interactive_timeout-wait_timeout">interactive_timeout &amp; wait_timeout</h3>
+<p>在连接空闲阶段(sleep)起作用，即使没有网络问题，也不能允许客户端一直占用连接。对于保持sleep状态超过了wait_timeout(或interactive_timeout，取决于client_interactive标志)的客户端，MySQL会主动断开连接。</p>
+<h3 id="lock_wait_timeout">lock_wait_timeout</h3>
+<p>获取MDL锁的等待时间，默认值是31536000秒=1年。<br>
+凡是需要获取MDL锁的操作都受到这个参数的影响，不单单是DDL语句，包含在表上的DML、DDL操作，以及视图、存储过程、存储函数、lock table，flush table with read lock语句等。但不适用于隐式访问系统表的语句，如：grant和revoke等。</p>
+<h3 id="net_read_timeout-net_write_timeout">net_read_timeout &amp; net_write_timeout</h3>
+<p>在连接繁忙阶段(query)起作用，即使连接没有处于sleep状态，即客户端忙于计算或者存储数据，MySQL也选择了有条件的等待。在数据包的分发过程中，客户端可能来不及响应（发送、接收、或者处理数据包太慢）。为了保证连接不被浪费在无尽的等待中，MySQL也会选择有条件（net_read_timeout和net_write_timeout）地主动断开连接。<br>
+这个参数只对TCP/IP链接有效，只针对在Activity状态下的线程有效。</p>
+<h3 id="slave_net_timeout">slave_net_timeout</h3>
+<p>Slave判断主库是否挂掉的超时设置，在设定时间内依然没有获取到Master的回应就认为Master已经挂掉了，后续根据超时重连参数设置进行重连主库的操作。默认值：3600s。</p>
+<h3 id="innodb_flush_log_at_timeout">innodb_flush_log_at_timeout</h3>
+<p>5.6.6引入，参数innodb_flush_log_at_trx_commit=1时，此超时参数不起作用，当innodb_flush_log_at_trx_commit=0/2时才起作用。5.6.6之后表示每innodb_flush_log_at_timeout秒一次的频率刷新redo log(在5.6.6之前是固定每秒一次刷新redo log，5.6.6之后刷新频率可以通过这个参数设置，当然，这个参数本身默认值也是1S)。</p>
+<h3 id="rpl_semi_sync_master_timeout">rpl_semi_sync_master_timeout</h3>
+<p>为semi-sync复制时，主库在某次事务提交时，如果等待超过rpl_semi_sync_master_timeout多秒之后仍然没有接收到任何从库做回包响应，那么主库自动降级为异步复制模式，当主库探测到有备库恢复回包时，主库自动恢复到semi-sync复制模式。默认值为10000毫秒=10秒。</p>
+<h3 id="rpl_stop_slave_timeout">rpl_stop_slave_timeout</h3>
+<p>5.6.13之后引入的参数，控制stop slave 的执行时间，在重放一个大的事务的时候,突然执行stop slave,命令 stop slave会执行很久,这个时候可能产生死锁或阻塞,严重影响性能，可以通过rpl_stop_slave_timeout参数控制stop slave 的执行时间。默认值是31536000秒=1年。</p>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[MySQL行长度限制(MySQL Row Length Limit)]]></title>
+        <id>https://blog.wenmingmin.site/post/mysql-xing-chang-du-xian-zhi-mysql-row-length-limit/</id>
+        <link href="https://blog.wenmingmin.site/post/mysql-xing-chang-du-xian-zhi-mysql-row-length-limit/">
+        </link>
+        <updated>2023-11-10T16:45:00.000Z</updated>
+        <content type="html"><![CDATA[<p><ul class="markdownIt-TOC">
+<li><a href="#%E8%A1%8C%E5%A4%A7%E5%B0%8F%E9%99%90%E5%88%B6">行大小限制</a></li>
+<li><a href="#compact%E8%A1%8C%E6%A0%BC%E5%BC%8F">COMPACT行格式</a></li>
+<li><a href="#%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8B">数据类型</a>
+<ul>
+<li><a href="#char">CHAR</a></li>
+<li><a href="#varchar">VARCHAR</a>
+<ul>
+<li><a href="#null%E6%A0%87%E8%AF%86%E5%AD%97%E6%AE%B5">NULL标识字段</a></li>
+<li><a href="#%E9%95%BF%E5%BA%A6%E8%A1%A8%E7%A4%BA%E4%BD%8D">长度表示位</a></li>
+</ul>
+</li>
+<li><a href="#text">TEXT</a></li>
+</ul>
+</li>
+<li><a href="#innodb%E7%B4%A2%E5%BC%95%E9%95%BF%E5%BA%A6%E9%99%90%E5%88%B6">InnoDB索引长度限制</a>
+<ul>
+<li><a href="#varchar%E5%92%8Ctext">VARCHAR和TEXT</a></li>
+</ul>
+</li>
+</ul>
+</p>
+<p>MySQL对于每个表都有一些硬限制，例如不超过4096列，但是实际上有效值是多少，取决于几个因素：</p>
+<ol>
+<li>表的最大行大小限制了列数量，所有的列的总长度不能超过行的最大值；</li>
+<li>列的存储字段类型限制，例如存储格式、字符集等；</li>
+<li>存储引擎的限制，例如InnoDB要求每个表不能超过1017列；</li>
+<li>功能部分实现为被隐藏的列；</li>
+</ol>
+<h1 id="行大小限制">行大小限制</h1>
+<p>由以下因素限制：</p>
+<ol>
+<li>表内部限制最大为65535字节，存储引擎最大支持也是这个值，BLOB、TEXT类型的值超长时会将内容存储到其他page，让page可以存储更多的行；</li>
+<li>对于4KB，8KB，16KB和32KB的<code>innodb_page_size</code>设置，表的最大行大小(本地存储)略小于page的一半。例如默认的16KB page，最大行大小略小于8KB，64KB page的最大行大小限制为16KB；</li>
+<li>可变长度字段类型，当可变类型字段值得长度超过行大小，则将超出的内容存储到外部page；</li>
+<li>不同存储格式使用了不同数量的page元数据，这也会影响行大小；</li>
+</ol>
+<h1 id="compact行格式">COMPACT行格式</h1>
+<p>COMPACT行格式按顺序包含：</p>
+<ol>
+<li>固定长度为5字节的记录头信息：描述本行记录的相关信息，如是否删除、下一个记录的位置，是否叶子节点等；</li>
+<li>可变字段长度列表：用于存储变长字段所占的字节数，其中超过255字节的字段使用2字节表示，未超过255则使用1字节表示；</li>
+<li>空值列表；</li>
+<li>字段值列表存储列本身的数据外，还存储6字节长度的事务id以及7字节长度的roll point，未设置主键的表数据还会存储6字节长度的行id。超出768字节的字符串，超出的部分会存储在溢出页中，并生成20字节的溢出页地址用于指向溢出页；</li>
+</ol>
+<blockquote>
+<p>DYNAMIC行格式不存储可变长度字段的数据，只存储数据所在地址；</p>
+</blockquote>
+<h1 id="数据类型">数据类型</h1>
+<h2 id="char">CHAR</h2>
+<p>最长255字符，真实长度据取决于字符集；</p>
+<h2 id="varchar">VARCHAR</h2>
+<p>最大长度 = （最大行大小(默认为65535字节) - NULL标识列占用字节数 - 长度标识字节数）/ 字符集单字符最大字节数。</p>
+<h3 id="null标识字段">NULL标识字段</h3>
+<p>如果有一个列允许为空，则需要1 bit来标识，每8 bits的标识会组成一个字段，该字段会存放在每行最开始的位置。如果有N个NULL 字段，则标识符占用的长度就是N/8 向上取整。</p>
+<blockquote>
+<ol>
+<li>根据存储的实现： 可以考虑用varchar替代tinytext</li>
+<li>如果需要非空的默认值，就必须使用varchar</li>
+<li>如果存储的数据大于64K，就必须使用到mediumtext , longtext varchar(255+)和text在存储机制是一样的</li>
+<li>需要特别注意varchar(255)不只是255byte ,实质上有可能占用的更多。</li>
+<li>特别注意，varchar大字段一样的会降低性能，所以在设计中还是一个原则大字段要拆出去，主表还是要尽量的瘦小.</li>
+</ol>
+</blockquote>
+<h3 id="长度表示位">长度表示位</h3>
+<p>存储开销是小于255只要1字节、大于255后使用两字节。是因为按照可能的数据大小，分为0 - 255(28)、256 - 65535(216)，刚好对应1字节和2字节。<br>
+但要注意，其计算根据的是字段声明的字符长度、计算可能的字节数(取编码的最大长度，如utf8 是3字节，而utf8mb4 是4字节)，再决定长度标志的字节数。如VARCHAR(100)，字符集为UTF8，可能的字节数为300，长度标识则为2字节。<br>
+MySQL中声明的类型长度都是字符数，而计算长度时需要转换成字节。</p>
+<h2 id="text">TEXT</h2>
+<p>TEXT最大长度为65535（2^16 − 1）个字符。如果是多字节字符，则有效最大长度会更少。存储时会增加2字节的前缀、标识长度。</p>
+<blockquote>
+<p>TEXT无法使用临时表。因为TEXT列可能很大，临时表空间会膨胀的非常快，所以MYSQL的MEMORY引擎不支持这类大的数据类型。 如果临时表列包括了TEXT类型，MySQL会直接用磁盘上的表、而不是内存中的表。 磁盘比内存的I/O效率低很多，这就意味着性能急剧降低。<br>
+建议避免使用select *，它会选择所有列，而是在已经确定结果集范围后、左联获取对应的TEXT字段；可以将TEXT单独拆出一个表，这样读写时减少与该列发生关系的可能，性能也会提升。</p>
+</blockquote>
+<h1 id="innodb索引长度限制">InnoDB索引长度限制</h1>
+<p>索引最大长度为767字节，索引会限制单独Key的最大长度为 767 字节，超过这个长度必须建立小于等于 767 字节的前缀索引。如果是utf-8 就是 255个字符，这也恰恰是能建索引情况下的最大值。如果是utf8mb4 , 则只能767 / 4 = 191 个字符。<br>
+修改索引限制长度需要在my.ini配置文件中添加以下内容(innodb_large_prefix=1，修改单列索引字节长度为767的限制，单列索引的长度变为307 )，并重启。但是开启该参数后还需要开启表的动态存储或压缩： 系统变量innodb_file_format为Barracuda，并且ROW_FORMAT为DYNAMIC或COMPRESSED。</p>
+<h2 id="varchar和text">VARCHAR和TEXT</h2>
+<p>VARCHAR是标准类型，但是TEXT不是。TEXT需要进行overflow存储，即768字节数据存在行中，其余的数据存储在其他page中。这种做法是为了让一个page可以容纳更多的行。<br>
+两者的区别还有默认值上的区别(TEXT不允许有默认值)，以及字段额外开销的区别：</p>
+<pre><code class="language-text"># overhead是指需要几个字节用于记录该字段的实际长度
+varchar 小于255byte  1byte overhead
+varchar 大于255byte  2byte overhead
+
+tinytext 0-255 1 byte overhead
+text 0-65535 byte 2 byte overhead
+mediumtext 0-16M  3 byte overhead
+longtext 0-4Gb 4byte overhead
+</code></pre>
+<p>TEXT如果不超过大约8KB时，超出768字节的部分不会存在别的page上。</p>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[golang指针方法和值方法]]></title>
+        <id>https://blog.wenmingmin.site/post/golang-zhi-zhen-fang-fa-he-zhi-fang-fa/</id>
+        <link href="https://blog.wenmingmin.site/post/golang-zhi-zhen-fang-fa-he-zhi-fang-fa/">
+        </link>
+        <updated>2022-01-13T14:09:23.000Z</updated>
+        <content type="html"><![CDATA[<pre><code class="language-golang">type MyInterFace interface {  
+   GetName() string  
+   GetId() uint  
+}  
+  
+type MyStruct struct {  
+   Name string  
+   Id   uint  
+}  
+  
+func (m *MyStruct) GetName() string {  
+   return m.Name  
+}  
+  
+func (m MyStruct) GetId() uint {  
+   return m.Id  
+}
+</code></pre>
+<p>无论是值类型还是指针类型,都能调用interface声明的方法.<br>
+但是区别:</p>
+<ul>
+<li>当值类型时,发生值拷贝,上述方法访问是不同的地址;</li>
+<li>指针类型则指向的是同一内存地址;</li>
+</ul>
+]]></content>
+    </entry>
+</feed>

@@ -1,0 +1,300 @@
+<html>
+<head>
+    <meta charset="utf-8"/>
+<meta name="description" content=""/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+<title>MySQL行长度限制(MySQL Row Length Limit) | MingminWen&#39;s Blog</title>
+
+<link rel="shortcut icon" href="https://blog.wenmingmin.site/favicon.ico?v=1739110776158">
+
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://blog.wenmingmin.site/styles/main.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.0/dist/css/bootstrap.min.css">
+
+<script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets/highlight.min.js"></script>
+<script src="https://cdn.bootcss.com/highlight.js/9.15.10/languages/dockerfile.min.js"></script>
+<script src="https://cdn.bootcss.com/highlight.js/9.15.10/languages/dart.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/moment@2.27.0/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.0/dist/js/bootstrap.min.js"></script>
+<!-- DEMO JS -->
+<!--<script src="media/scripts/index.js"></script>-->
+
+
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.css">
+</head>
+<body>
+<div class="main gt-bg-theme-color-first">
+    <nav class="navbar navbar-expand-lg">
+    <div class="navbar-brand">
+        <img class="user-avatar" src="/images/avatar.png" alt="头像">
+        <div class="site-name gt-c-content-color-first">
+            MingminWen&#39;s Blog
+        </div>
+    </div>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <i class="fas fa-bars gt-c-content-color-first" style="font-size: 18px"></i>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <div class="navbar-nav mr-auto" style="text-align: center">
+            
+                <div class="nav-item">
+                    
+                        <a href="/" class="menu gt-a-link">
+                            首页
+                        </a>
+                    
+                </div>
+            
+                <div class="nav-item">
+                    
+                        <a href="/archives" class="menu gt-a-link">
+                            归档
+                        </a>
+                    
+                </div>
+            
+                <div class="nav-item">
+                    
+                        <a href="/tags" class="menu gt-a-link">
+                            标签
+                        </a>
+                    
+                </div>
+            
+                <div class="nav-item">
+                    
+                        <a href="/post/about" class="menu gt-a-link">
+                            关于
+                        </a>
+                    
+                </div>
+            
+        </div>
+        <div style="text-align: center">
+            <form id="gridea-search-form" style="position: relative" data-update="1739110776158" action="/search/index.html">
+                <input class="search-input" autocomplete="off" spellcheck="false" name="q" placeholder="搜索文章" />
+                <i class="fas fa-search gt-c-content-color-first" style="position: absolute; top: 9px; left: 10px;"></i>
+            </form>
+        </div>
+    </div>
+</nav>
+
+    <div class="post-container">
+        <div class="post-detail gt-bg-theme-color-second">
+            <article class="gt-post-content">
+                <h2 class="post-title">
+                    MySQL行长度限制(MySQL Row Length Limit)
+                </h2>
+                <div class="post-info">
+                    <time class="post-time gt-c-content-color-first">
+                        · 2023-11-11 ·
+                    </time>
+                    
+                        <a href="https://blog.wenmingmin.site/tag/HpaKu0eZxT/" class="post-tags">
+                            # MySQL
+                        </a>
+                    
+                </div>
+                <div class="post-content">
+                    <p><ul class="markdownIt-TOC">
+<li><a href="#%E8%A1%8C%E5%A4%A7%E5%B0%8F%E9%99%90%E5%88%B6">行大小限制</a></li>
+<li><a href="#compact%E8%A1%8C%E6%A0%BC%E5%BC%8F">COMPACT行格式</a></li>
+<li><a href="#%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8B">数据类型</a>
+<ul>
+<li><a href="#char">CHAR</a></li>
+<li><a href="#varchar">VARCHAR</a>
+<ul>
+<li><a href="#null%E6%A0%87%E8%AF%86%E5%AD%97%E6%AE%B5">NULL标识字段</a></li>
+<li><a href="#%E9%95%BF%E5%BA%A6%E8%A1%A8%E7%A4%BA%E4%BD%8D">长度表示位</a></li>
+</ul>
+</li>
+<li><a href="#text">TEXT</a></li>
+</ul>
+</li>
+<li><a href="#innodb%E7%B4%A2%E5%BC%95%E9%95%BF%E5%BA%A6%E9%99%90%E5%88%B6">InnoDB索引长度限制</a>
+<ul>
+<li><a href="#varchar%E5%92%8Ctext">VARCHAR和TEXT</a></li>
+</ul>
+</li>
+</ul>
+</p>
+<p>MySQL对于每个表都有一些硬限制，例如不超过4096列，但是实际上有效值是多少，取决于几个因素：</p>
+<ol>
+<li>表的最大行大小限制了列数量，所有的列的总长度不能超过行的最大值；</li>
+<li>列的存储字段类型限制，例如存储格式、字符集等；</li>
+<li>存储引擎的限制，例如InnoDB要求每个表不能超过1017列；</li>
+<li>功能部分实现为被隐藏的列；</li>
+</ol>
+<h1 id="行大小限制">行大小限制</h1>
+<p>由以下因素限制：</p>
+<ol>
+<li>表内部限制最大为65535字节，存储引擎最大支持也是这个值，BLOB、TEXT类型的值超长时会将内容存储到其他page，让page可以存储更多的行；</li>
+<li>对于4KB，8KB，16KB和32KB的<code>innodb_page_size</code>设置，表的最大行大小(本地存储)略小于page的一半。例如默认的16KB page，最大行大小略小于8KB，64KB page的最大行大小限制为16KB；</li>
+<li>可变长度字段类型，当可变类型字段值得长度超过行大小，则将超出的内容存储到外部page；</li>
+<li>不同存储格式使用了不同数量的page元数据，这也会影响行大小；</li>
+</ol>
+<h1 id="compact行格式">COMPACT行格式</h1>
+<p>COMPACT行格式按顺序包含：</p>
+<ol>
+<li>固定长度为5字节的记录头信息：描述本行记录的相关信息，如是否删除、下一个记录的位置，是否叶子节点等；</li>
+<li>可变字段长度列表：用于存储变长字段所占的字节数，其中超过255字节的字段使用2字节表示，未超过255则使用1字节表示；</li>
+<li>空值列表；</li>
+<li>字段值列表存储列本身的数据外，还存储6字节长度的事务id以及7字节长度的roll point，未设置主键的表数据还会存储6字节长度的行id。超出768字节的字符串，超出的部分会存储在溢出页中，并生成20字节的溢出页地址用于指向溢出页；</li>
+</ol>
+<blockquote>
+<p>DYNAMIC行格式不存储可变长度字段的数据，只存储数据所在地址；</p>
+</blockquote>
+<h1 id="数据类型">数据类型</h1>
+<h2 id="char">CHAR</h2>
+<p>最长255字符，真实长度据取决于字符集；</p>
+<h2 id="varchar">VARCHAR</h2>
+<p>最大长度 = （最大行大小(默认为65535字节) - NULL标识列占用字节数 - 长度标识字节数）/ 字符集单字符最大字节数。</p>
+<h3 id="null标识字段">NULL标识字段</h3>
+<p>如果有一个列允许为空，则需要1 bit来标识，每8 bits的标识会组成一个字段，该字段会存放在每行最开始的位置。如果有N个NULL 字段，则标识符占用的长度就是N/8 向上取整。</p>
+<blockquote>
+<ol>
+<li>根据存储的实现： 可以考虑用varchar替代tinytext</li>
+<li>如果需要非空的默认值，就必须使用varchar</li>
+<li>如果存储的数据大于64K，就必须使用到mediumtext , longtext varchar(255+)和text在存储机制是一样的</li>
+<li>需要特别注意varchar(255)不只是255byte ,实质上有可能占用的更多。</li>
+<li>特别注意，varchar大字段一样的会降低性能，所以在设计中还是一个原则大字段要拆出去，主表还是要尽量的瘦小.</li>
+</ol>
+</blockquote>
+<h3 id="长度表示位">长度表示位</h3>
+<p>存储开销是小于255只要1字节、大于255后使用两字节。是因为按照可能的数据大小，分为0 - 255(28)、256 - 65535(216)，刚好对应1字节和2字节。<br>
+但要注意，其计算根据的是字段声明的字符长度、计算可能的字节数(取编码的最大长度，如utf8 是3字节，而utf8mb4 是4字节)，再决定长度标志的字节数。如VARCHAR(100)，字符集为UTF8，可能的字节数为300，长度标识则为2字节。<br>
+MySQL中声明的类型长度都是字符数，而计算长度时需要转换成字节。</p>
+<h2 id="text">TEXT</h2>
+<p>TEXT最大长度为65535（2^16 − 1）个字符。如果是多字节字符，则有效最大长度会更少。存储时会增加2字节的前缀、标识长度。</p>
+<blockquote>
+<p>TEXT无法使用临时表。因为TEXT列可能很大，临时表空间会膨胀的非常快，所以MYSQL的MEMORY引擎不支持这类大的数据类型。 如果临时表列包括了TEXT类型，MySQL会直接用磁盘上的表、而不是内存中的表。 磁盘比内存的I/O效率低很多，这就意味着性能急剧降低。<br>
+建议避免使用select *，它会选择所有列，而是在已经确定结果集范围后、左联获取对应的TEXT字段；可以将TEXT单独拆出一个表，这样读写时减少与该列发生关系的可能，性能也会提升。</p>
+</blockquote>
+<h1 id="innodb索引长度限制">InnoDB索引长度限制</h1>
+<p>索引最大长度为767字节，索引会限制单独Key的最大长度为 767 字节，超过这个长度必须建立小于等于 767 字节的前缀索引。如果是utf-8 就是 255个字符，这也恰恰是能建索引情况下的最大值。如果是utf8mb4 , 则只能767 / 4 = 191 个字符。<br>
+修改索引限制长度需要在my.ini配置文件中添加以下内容(innodb_large_prefix=1，修改单列索引字节长度为767的限制，单列索引的长度变为307 )，并重启。但是开启该参数后还需要开启表的动态存储或压缩： 系统变量innodb_file_format为Barracuda，并且ROW_FORMAT为DYNAMIC或COMPRESSED。</p>
+<h2 id="varchar和text">VARCHAR和TEXT</h2>
+<p>VARCHAR是标准类型，但是TEXT不是。TEXT需要进行overflow存储，即768字节数据存在行中，其余的数据存储在其他page中。这种做法是为了让一个page可以容纳更多的行。<br>
+两者的区别还有默认值上的区别(TEXT不允许有默认值)，以及字段额外开销的区别：</p>
+<pre><code class="language-text"># overhead是指需要几个字节用于记录该字段的实际长度
+varchar 小于255byte  1byte overhead
+varchar 大于255byte  2byte overhead
+
+tinytext 0-255 1 byte overhead
+text 0-65535 byte 2 byte overhead
+mediumtext 0-16M  3 byte overhead
+longtext 0-4Gb 4byte overhead
+</code></pre>
+<p>TEXT如果不超过大约8KB时，超出768字节的部分不会存在别的page上。</p>
+
+                </div>
+            </article>
+        </div>
+
+        
+            <div class="next-post">
+                <div class="next gt-c-content-color-first">下一篇</div>
+                <a href="https://blog.wenmingmin.site/post/golang-zhi-zhen-fang-fa-he-zhi-fang-fa/" class="post-title gt-a-link">
+                    golang指针方法和值方法
+                </a>
+            </div>
+        
+
+        
+
+        
+            
+                <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk/dist/gitalk.min.css">
+<script src="https://cdn.jsdelivr.net/npm/gitalk/dist/gitalk.min.js"></script>
+<script>
+    // md5.min.js
+    !function(n){
+        "use strict";
+        function d(n,t){var r=(65535&n)+(65535&t);return(n>>16)+(t>>16)+(r>>16)<<16|65535&r}
+        function f(n,t,r,e,o,u){return d((c=d(d(t,n),d(e,u)))<<(f=o)|c>>>32-f,r);var c,f}
+        function l(n,t,r,e,o,u,c){return f(t&r|~t&e,n,t,o,u,c)}
+        function v(n,t,r,e,o,u,c){return f(t&e|r&~e,n,t,o,u,c)}
+        function g(n,t,r,e,o,u,c){return f(t^r^e,n,t,o,u,c)}
+        function m(n,t,r,e,o,u,c){return f(r^(t|~e),n,t,o,u,c)}
+        function i(n,t){var r,e,o,u,c;n[t>>5]|=128<<t%32,n[14+(t+64>>>9<<4)]=t;var f=1732584193,i=-271733879,a=-1732584194,h=271733878;for(r=0;r<n.length;r+=16)f=l(e=f,o=i,u=a,c=h,n[r],7,-680876936),h=l(h,f,i,a,n[r+1],12,-389564586),a=l(a,h,f,i,n[r+2],17,606105819),i=l(i,a,h,f,n[r+3],22,-1044525330),f=l(f,i,a,h,n[r+4],7,-176418897),h=l(h,f,i,a,n[r+5],12,1200080426),a=l(a,h,f,i,n[r+6],17,-1473231341),i=l(i,a,h,f,n[r+7],22,-45705983),f=l(f,i,a,h,n[r+8],7,1770035416),h=l(h,f,i,a,n[r+9],12,-1958414417),a=l(a,h,f,i,n[r+10],17,-42063),i=l(i,a,h,f,n[r+11],22,-1990404162),f=l(f,i,a,h,n[r+12],7,1804603682),h=l(h,f,i,a,n[r+13],12,-40341101),a=l(a,h,f,i,n[r+14],17,-1502002290),f=v(f,i=l(i,a,h,f,n[r+15],22,1236535329),a,h,n[r+1],5,-165796510),h=v(h,f,i,a,n[r+6],9,-1069501632),a=v(a,h,f,i,n[r+11],14,643717713),i=v(i,a,h,f,n[r],20,-373897302),f=v(f,i,a,h,n[r+5],5,-701558691),h=v(h,f,i,a,n[r+10],9,38016083),a=v(a,h,f,i,n[r+15],14,-660478335),i=v(i,a,h,f,n[r+4],20,-405537848),f=v(f,i,a,h,n[r+9],5,568446438),h=v(h,f,i,a,n[r+14],9,-1019803690),a=v(a,h,f,i,n[r+3],14,-187363961),i=v(i,a,h,f,n[r+8],20,1163531501),f=v(f,i,a,h,n[r+13],5,-1444681467),h=v(h,f,i,a,n[r+2],9,-51403784),a=v(a,h,f,i,n[r+7],14,1735328473),f=g(f,i=v(i,a,h,f,n[r+12],20,-1926607734),a,h,n[r+5],4,-378558),h=g(h,f,i,a,n[r+8],11,-2022574463),a=g(a,h,f,i,n[r+11],16,1839030562),i=g(i,a,h,f,n[r+14],23,-35309556),f=g(f,i,a,h,n[r+1],4,-1530992060),h=g(h,f,i,a,n[r+4],11,1272893353),a=g(a,h,f,i,n[r+7],16,-155497632),i=g(i,a,h,f,n[r+10],23,-1094730640),f=g(f,i,a,h,n[r+13],4,681279174),h=g(h,f,i,a,n[r],11,-358537222),a=g(a,h,f,i,n[r+3],16,-722521979),i=g(i,a,h,f,n[r+6],23,76029189),f=g(f,i,a,h,n[r+9],4,-640364487),h=g(h,f,i,a,n[r+12],11,-421815835),a=g(a,h,f,i,n[r+15],16,530742520),f=m(f,i=g(i,a,h,f,n[r+2],23,-995338651),a,h,n[r],6,-198630844),h=m(h,f,i,a,n[r+7],10,1126891415),a=m(a,h,f,i,n[r+14],15,-1416354905),i=m(i,a,h,f,n[r+5],21,-57434055),f=m(f,i,a,h,n[r+12],6,1700485571),h=m(h,f,i,a,n[r+3],10,-1894986606),a=m(a,h,f,i,n[r+10],15,-1051523),i=m(i,a,h,f,n[r+1],21,-2054922799),f=m(f,i,a,h,n[r+8],6,1873313359),h=m(h,f,i,a,n[r+15],10,-30611744),a=m(a,h,f,i,n[r+6],15,-1560198380),i=m(i,a,h,f,n[r+13],21,1309151649),f=m(f,i,a,h,n[r+4],6,-145523070),h=m(h,f,i,a,n[r+11],10,-1120210379),a=m(a,h,f,i,n[r+2],15,718787259),i=m(i,a,h,f,n[r+9],21,-343485551),f=d(f,e),i=d(i,o),a=d(a,u),h=d(h,c);return[f,i,a,h]}
+        function a(n){var t,r="",e=32*n.length;for(t=0;t<e;t+=8)r+=String.fromCharCode(n[t>>5]>>>t%32&255);return r}
+        function h(n){var t,r=[];for(r[(n.length>>2)-1]=void 0,t=0;t<r.length;t+=1)r[t]=0;var e=8*n.length;for(t=0;t<e;t+=8)r[t>>5]|=(255&n.charCodeAt(t/8))<<t%32;return r}
+        function e(n){var t,r,e="0123456789abcdef",o="";for(r=0;r<n.length;r+=1)t=n.charCodeAt(r),o+=e.charAt(t>>>4&15)+e.charAt(15&t);return o}
+        function r(n){return unescape(encodeURIComponent(n))}
+        function o(n){return a(i(h(t=r(n)),8*t.length));var t}
+        function u(n,t){return function(n,t){var r,e,o=h(n),u=[],c=[];for(u[15]=c[15]=void 0,16<o.length&&(o=i(o,8*n.length)),r=0;r<16;r+=1)u[r]=909522486^o[r],c[r]=1549556828^o[r];return e=i(u.concat(h(t)),512+8*t.length),a(i(c.concat(e),640))}(r(n),r(t))}
+        function t(n,t,r){return t?r?u(t,n):e(u(t,n)):r?o(n):e(o(n))}
+        "function"==typeof define&&define.amd?define(function(){return t}):"object"==typeof module&&module.exports?module.exports=t:n.md5=t;
+    }(this);
+</script>
+
+
+<div id="gitalk-container"></div>
+
+<script>
+
+  var gitalk = new Gitalk({
+    clientID: 'Ov23li9q2XrYx8rSi21H',
+    clientSecret: 'b01aa4c2530e1d9010857f46686203a9c24c738c',
+    repo: 'arlenwen.github.io',
+    owner: 'ArlenWen',
+    admin: ['ArlenWen'],
+    id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+    distractionFreeMode: false       // Facebook-like distraction free mode
+  })
+
+  gitalk.render('gitalk-container')
+
+</script>
+
+            
+
+            
+        
+
+        
+
+        <div class="site-footer gt-c-content-color-first">
+    <div class="slogan gt-c-content-color-first">好好记录自己的技术生涯</div>
+    <div class="social-container">
+        
+            
+                <a href="https://github.com/ArlenWen" target="_blank">
+                    <i class="fab fa-github gt-c-content-color-first"></i>
+                </a>
+            
+        
+            
+        
+            
+        
+            
+        
+            
+        
+            
+        
+    </div>
+    <div class="footer-info">
+        Powered by <a href="https://github.com/getgridea/gridea" target="_blank">Gridea</a>
+    </div>
+    <div>
+        Theme by <a href="https://imhanjie.com/" target="_blank">imhanjie</a>, Powered by <a
+                href="https://github.com/getgridea/gridea" target="_blank">Gridea | <a href="https://blog.wenmingmin.site/atom.xml" target="_blank">RSS</a></a>
+    </div>
+</div>
+
+<script>
+  hljs.initHighlightingOnLoad()
+</script>
+
+    </div>
+</div>
+</body>
+</html>
